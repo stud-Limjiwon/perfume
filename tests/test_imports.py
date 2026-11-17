@@ -26,6 +26,7 @@ import pytest
         "src.calibration",
         "src.gaze_prediction",
         "src.attention_detection",
+        "src.session_log",
         "src.visualization",
         "training",
         "training.baseline",
