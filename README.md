@@ -20,13 +20,14 @@
 | 폴더 구조·가상환경·패키지 설치 | 완료 |
 | VS Code 인터프리터·디버깅·포맷팅 설정 | 작성 완료 |
 | 웹캠 입력·영상 표시·Q 종료·리소스 해제 코드 | 구현 완료 |
-| 패키지·프로젝트 import·검출·종료 처리 자동 테스트 | 53개 통과 (2026-11-17) |
+| 패키지·프로젝트 import·검출·종료 처리 자동 테스트 | 90개 통과 (2026-11-18) |
 | 실제 웹캠 장치 열기·640×480 프레임 수신 | 확인 완료 |
 | 실제 웹캠 랜드마크 추론·미검출 후 복귀 | 60프레임 처리, 33프레임에서 478개 랜드마크 검출 |
 | 실제 미리보기 영상 내용·Q 키 종료 | 최종 수동 확인 필요 |
 | 얼굴·눈·홍채 랜드마크 검출·표시 | 구현. [실행 및 모델 준비 안내](docs/landmarks.md) |
 | 이탈 판정 설정값(초안) | `config/settings.py`에 작성. 직접 촬영 데이터로 조정 예정 |
-| 동공 위치·5점 보정·이탈 판정·기록·경고 표시 | 모듈 구조와 TODO만 작성 |
+| 이탈 판정·체인값 기록·결과 목록 | 구현 (가짜 데이터 테스트로 검증) |
+| 시험 감독 화면·동공 위치·5점 보정 | 구현 (동공·보정은 임시, 실제 웹캠 전체 흐름 확인 필요) |
 
 영상과 데이터는 저장하지 않습니다. Google 공식 Face Landmarker 모델 파일을 준비하여 랜드마크 검출에 사용합니다. 데이터셋 다운로드, 눈 특징 계산, 보정 데이터 수집과 모델 학습은 아직 진행하지 않았습니다. 초기 환경 검증은 [환경 구축 보고서](docs/setup_report.md), 현재 검출 기능은 [랜드마크 안내](docs/landmarks.md)를 참고하세요.
 
@@ -56,7 +57,8 @@ C:\perfume
 ├── .vscode/
 │   ├── settings.json          # 인터프리터·포맷팅·테스트 설정
 │   └── launch.json            # main.py 디버깅 설정
-├── main.py                    # 웹캠 실행 진입점
+├── main.py                    # 랜드마크 미리보기 실행
+├── exam.py                    # 시험 감독 화면 실행
 ├── requirements.txt           # 필수 패키지 목록
 ├── requirements-lock.txt      # 재현용 전체 패키지 버전
 ├── README.md
@@ -74,6 +76,8 @@ C:\perfume
 │   ├── gaze_prediction.py
 │   ├── attention_detection.py
 │   ├── session_log.py
+│   ├── report.py
+│   ├── exam_app.py
 │   └── visualization.py
 ├── training/
 │   ├── __init__.py
@@ -162,6 +166,20 @@ cd C:\perfume
 
 프로젝트 설정에는 가상환경 자동 활성화, 저장 시 Ruff 포맷팅, 루트 기준 import 경로가 포함되어 있습니다. F5로 `Python: Webcam Preview` 디버깅 설정을 실행할 수 있습니다. `.env`는 선택 사항이며, 일반 `main.py` 실행에서는 자동으로 읽지 않습니다.
 
+## 시험 감독 화면 실행
+
+```powershell
+cd C:\perfume
+.\.venv\Scripts\python.exe exam.py
+```
+
+1. **화면 1 (시험 시작 전):** 학생 이름, 시험 시간(시:분:초), 감독관 패스워드(6자 이상)를 입력하고 `보정 시작`
+2. **5점 보정:** 전체 화면에 점이 하나씩 뜹니다. 고개는 그대로 두고 눈으로 점을 2초씩 봅니다 (Esc: 취소).
+3. **화면 2 (시험 중):** 남은 시간, 웹캠, 동공 이탈·자리 이탈 누적 게이지와 횟수, 처리 속도(FPS). 끝내려면 `시험 종료 (감독관)` + 패스워드
+4. **화면 3 (시험 종료 후):** 패스워드로 본인 확인 → 무결성 결과, 의심 정황 목록(빨강: 이탈 1건, 노랑: 누적 기준 도달), `체인값 ›`으로 체인값 조회
+
+기록은 `logs/sessions/`에 저장되며 Git에 올라가지 않습니다. 동공 위치(`src/features.py`)와 보정(`src/calibration.py`)은 MediaPipe 기반 임시 구현입니다.
+
 ## 웹캠 및 랜드마크 실행
 
 먼저 [랜드마크 안내의 모델 준비 절차](docs/landmarks.md)를 실행합니다. 모델은 Git에서 제외되므로 팀원마다 준비해야 합니다. 기본 실행은 얼굴·눈·홍채를 표시하며, 모델 없이 웹캠만 확인하려면 `main.py --camera-only`를 사용합니다.
@@ -209,11 +227,13 @@ cd C:\perfume
 | `config/settings.py` | 카메라·검출·이탈 판정 설정 | 구현 (판정 값은 초안) |
 | `src/camera.py` | 웹캠 입력·미리보기·종료·리소스 해제 | 구현 |
 | `src/landmarks.py` | 얼굴·눈·홍채 검출·표시·모델 해제 | 구현 |
-| `src/features.py` | 눈 안에서 동공 상대 위치 계산, OpenCV 방식 비교 | TODO |
-| `src/calibration.py` | 5점 보정으로 집중 구역 설정 | TODO |
-| `src/attention_detection.py` | 집중 구역·자리 이탈 판정, 부정행위 의심 표시 | TODO |
-| `src/session_log.py` | 이탈 기록 CSV와 SHA256 해시값 저장 | TODO |
-| `src/visualization.py` | 실시간 경고·FPS 표시, 종료 후 결과 요약 | TODO |
+| `src/features.py` | 눈 안에서 동공 상대 위치 계산 | 임시 구현 (MediaPipe). OpenCV 방식 비교 예정 |
+| `src/calibration.py` | 5점 보정으로 집중 구역 설정 | 임시 구현. 기준 근거 조정 예정 |
+| `src/attention_detection.py` | 집중 구역·자리 이탈 판정, 부정행위 의심 표시 | 구현 |
+| `src/session_log.py` | 패스워드 키·체인값 기록과 위·변조 검증 | 구현 |
+| `src/report.py` | 결과 화면 의심 정황 목록(빨강·노랑), 명령줄 조회 | 구현 |
+| `src/exam_app.py`, `exam.py` | 시험 감독 화면 1·보정·2·3 (Tkinter) | 구현 |
+| `src/visualization.py` | 종료 후 이탈 타임라인 그래프 | TODO |
 | `src/gaze_prediction.py` | [도전 목표] 화면 좌표 추정 | TODO |
 | `training/*.py` | [도전 목표] 좌표 추정 모델 학습·평가 | TODO |
 
