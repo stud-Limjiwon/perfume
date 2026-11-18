@@ -28,5 +28,7 @@ FACE_MISSING_SECONDS = 1.0  # 얼굴이 이 시간보다 오래 안 보이면 �
 SUSPICIOUS_DEPARTURE_COUNT = 5
 SUSPICIOUS_TOTAL_SECONDS = 30.0
 
-# 세션 기록 (이탈 시각·지속 시간 CSV와 해시값. 영상은 저장하지 않는다)
+# 세션 기록 (이탈 시각·지속 시간 CSV와 체인값. 영상은 저장하지 않는다)
 SESSION_LOG_DIR = PROJECT_ROOT / "logs" / "sessions"
+PASSWORD_MIN_LENGTH = 6  # 감독관 패스워드: 체인값 키 생성과 결과 조회 인증에 사용
+PBKDF2_ITERATIONS = 200_000  # 패스워드를 키로 바꿀 때 반복 횟수 (높을수록 추측이 느려짐)
