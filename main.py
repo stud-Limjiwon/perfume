@@ -7,7 +7,13 @@ from pathlib import Path
 
 import cv2
 
-from config.settings import FACE_LANDMARKER_MODEL
+from config.settings import (
+    CAMERA_INDEX,
+    FACE_LANDMARKER_MODEL,
+    FRAME_HEIGHT,
+    FRAME_WIDTH,
+    ZOOM,
+)
 from src.camera import run_preview
 from src.landmarks import FaceLandmarkDetector
 
@@ -17,6 +23,22 @@ def positive_int(value: str) -> int:
     number = int(value)
     if number < 1:
         raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
+
+
+def non_negative_int(value: str) -> int:
+    """카메라 인덱스처럼 0부터 시작하는 정수를 검증한다."""
+    number = int(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError("must be zero or a positive integer")
+    return number
+
+
+def zoom_factor(value: str) -> float:
+    """디지털 줌 배율은 1.0 이상만 허용한다."""
+    number = float(value)
+    if not number >= 1:
+        raise argparse.ArgumentTypeError("must be 1.0 or greater")
     return number
 
 
@@ -42,6 +64,24 @@ def main() -> int:
         action="store_true",
         help="process without GUI; requires --max-frames",
     )
+    parser.add_argument(
+        "--camera-index",
+        type=non_negative_int,
+        default=CAMERA_INDEX,
+        help="camera device index (external webcam is usually 1)",
+    )
+    parser.add_argument(
+        "--width", type=positive_int, default=FRAME_WIDTH, help="requested width"
+    )
+    parser.add_argument(
+        "--height", type=positive_int, default=FRAME_HEIGHT, help="requested height"
+    )
+    parser.add_argument(
+        "--zoom",
+        type=zoom_factor,
+        default=ZOOM,
+        help="digital zoom: crop the fixed center 1/ZOOM area",
+    )
     args = parser.parse_args()
     if args.headless and args.max_frames is None:
         parser.error("--headless requires --max-frames")
@@ -57,6 +97,10 @@ def main() -> int:
                 max_frames=args.max_frames,
                 frame_processor=processor,
                 display=not args.headless,
+                camera_index=args.camera_index,
+                width=args.width,
+                height=args.height,
+                zoom=args.zoom,
             )
     except (OSError, RuntimeError, ValueError, cv2.error) as error:
         print(f"실행 실패: {error}", file=sys.stderr)

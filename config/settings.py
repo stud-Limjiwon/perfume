@@ -9,6 +9,9 @@ CAMERA_INDEX = 0
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 TARGET_FPS = 30
+ZOOM = 1.0  # 1.0보다 크면 화면 중앙 고정 영역을 잘라 확대한다 (디지털 줌)
+FPS_WINDOW_SECONDS = 1.0  # 실제 처리 FPS를 계산하는 최근 구간
+FPS_LOG_INTERVAL_SECONDS = 1.0  # 터미널에 FPS를 출력하는 간격
 WINDOW_NAME = "Webcam Preview - Press Q to quit"
 
 # 얼굴·눈·홍채 검출 (MediaPipe: OpenCV 방식 검출 결과를 비교할 기준)

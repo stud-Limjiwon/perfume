@@ -15,7 +15,47 @@ def test_camera_only_does_not_load_model(monkeypatch):
     monkeypatch.setattr("sys.argv", ["main.py", "--camera-only", "--max-frames", "2"])
     assert main.main() == 0
     detector.assert_not_called()
-    preview.assert_called_once_with(max_frames=2, frame_processor=None, display=True)
+    preview.assert_called_once_with(
+        max_frames=2,
+        frame_processor=None,
+        display=True,
+        camera_index=main.CAMERA_INDEX,
+        width=main.FRAME_WIDTH,
+        height=main.FRAME_HEIGHT,
+        zoom=main.ZOOM,
+    )
+
+
+def test_camera_options_are_passed(monkeypatch):
+    preview = Mock()
+    monkeypatch.setattr(main, "run_preview", preview)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "main.py",
+            "--camera-only",
+            "--camera-index",
+            "1",
+            "--width",
+            "1280",
+            "--height",
+            "720",
+            "--zoom",
+            "2",
+        ],
+    )
+    assert main.main() == 0
+    kwargs = preview.call_args.kwargs
+    assert (kwargs["camera_index"], kwargs["width"], kwargs["height"]) == (1, 1280, 720)
+    assert kwargs["zoom"] == 2.0
+
+
+@pytest.mark.parametrize("zoom", ["0.5", "nan"])
+def test_invalid_zoom_is_rejected(monkeypatch, zoom):
+    monkeypatch.setattr("sys.argv", ["main.py", "--zoom", zoom])
+    with pytest.raises(SystemExit) as exc:
+        main.main()
+    assert exc.value.code == 2
 
 
 def test_preview_failure_closes_detector(monkeypatch):

@@ -103,10 +103,10 @@ def test_callback_failure_releases_camera(monkeypatch):
 
 
 def test_preview_displays_processed_frame(monkeypatch):
-    """화면에는 원본 대신 콜백이 반환한 주석 영상을 표시한다."""
+    """화면에는 원본 대신 콜백이 반환한 주석 영상에 FPS 표시줄을 더해 보여준다."""
     import numpy as np
 
-    original = np.zeros((2, 2, 3), dtype=np.uint8)
+    original = np.zeros((100, 100, 3), dtype=np.uint8)
     annotated = np.full_like(original, 255)
     capture = Mock()
     capture.isOpened.return_value = True
@@ -118,10 +118,61 @@ def test_preview_displays_processed_frame(monkeypatch):
     monkeypatch.setattr(camera.cv2, "waitKey", Mock(return_value=ord("q")))
     monkeypatch.setattr(camera.cv2, "destroyAllWindows", Mock())
     camera.run_preview(frame_processor=Mock(return_value=annotated))
-    assert show.call_args.args[1] is annotated
+    shown = show.call_args.args[1]
+    assert np.array_equal(shown[:50], annotated[:50])
+    assert not np.array_equal(shown[-20:], annotated[-20:])
     capture.release.assert_called_once_with()
 
 
 def test_headless_requires_finite_run():
     with pytest.raises(ValueError, match="max_frames"):
         camera.run_preview(display=False)
+
+
+def test_crop_center_keeps_fixed_center_area():
+    """2배 줌은 중앙 절반 영역을 늘리지 않고 그대로 잘라낸다."""
+    import numpy as np
+
+    frame = np.arange(8 * 6 * 3, dtype=np.uint8).reshape(6, 8, 3)
+    cropped = camera.crop_center(frame, 2.0)
+    assert cropped.shape == (3, 4, 3)
+    assert np.array_equal(cropped, frame[1:4, 2:6])
+    assert cropped.flags["C_CONTIGUOUS"]
+    assert camera.crop_center(frame, 1.0) is frame
+
+
+def test_crop_center_rejects_zoom_out():
+    import numpy as np
+
+    with pytest.raises(ValueError, match="zoom"):
+        camera.crop_center(np.zeros((2, 2, 3), dtype=np.uint8), 0.5)
+
+
+def test_fps_meter_uses_recent_window():
+    """1초 구간 안의 프레임 간격과 평균 처리 시간을 계산하고 오래된 값은 버린다."""
+    meter = camera.FpsMeter(window_seconds=1.0)
+    assert meter.fps == 0.0
+    for index in range(11):
+        meter.update(index * 100_000_000, 5_000_000)
+    assert meter.fps == pytest.approx(10.0)
+    assert meter.process_ms == pytest.approx(5.0)
+    meter.update(3_000_000_000, 20_000_000)
+    assert meter.fps == 0.0
+    assert meter.process_ms == pytest.approx(20.0)
+
+
+def test_zoom_crops_before_processing(monkeypatch):
+    """검출 콜백은 줌으로 잘라낸 영상을 받는다."""
+    import numpy as np
+
+    capture = Mock()
+    capture.isOpened.return_value = True
+    capture.read.return_value = (True, np.zeros((480, 640, 3), dtype=np.uint8))
+    capture.get.return_value = 30.0
+    monkeypatch.setattr(camera.cv2, "VideoCapture", Mock(return_value=capture))
+    processor = Mock(side_effect=lambda frame, _: frame)
+    camera.run_preview(
+        max_frames=1, frame_processor=processor, display=False, zoom=2.0
+    )
+    assert processor.call_args.args[0].shape == (240, 320, 3)
+    capture.release.assert_called_once_with()
